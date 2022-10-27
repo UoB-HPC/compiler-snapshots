@@ -223,6 +223,11 @@ object WebApp {
           }
         )
 
+        val repo = (window.location.hostname, window.location.pathname) match {
+          case (s"$owner.github.io", s"/$repo/") => s"$owner/$repo"
+          case _                                 => "UNKNOWN"
+        }
+
         val selectedBuild = article(
           cls    := "message is-info",
           height := 100.pct,
@@ -237,10 +242,7 @@ object WebApp {
                   case None if lut.isEmpty => span(s"Loading")
                   case None                => span(s"Build \"$x\" not found")
                   case Some((name, build, compiler)) =>
-                    val repo = (window.location.hostname, window.location.pathname) match {
-                      case (s"$owner.github.io", s"/$repo/") => s"$owner/$repo"
-                      case _                                 => "UNKNOWN"
-                    }
+
                     div(
                       overflow.hidden,
                       height := 100.pct,
@@ -328,7 +330,7 @@ object WebApp {
               ", most distros released after 2012 should be able to just download, untar, and use as-is without any external dependencies",
               br(),
               "APIs for listing all snapshots, build scripts, and Dockerfile for generating the snapshots are available ",
-              a("in the repo"),
+              a("in the repo", href := s"https://github.com/$repo/"),
               "."
             )
           ),
