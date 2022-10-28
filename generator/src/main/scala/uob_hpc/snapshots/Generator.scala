@@ -265,7 +265,7 @@ object Generator {
       val parent = Files.createDirectories(Paths.get(config.name))
       println(s"Generating static APIs ($builds files) in $parent")
       builds.foreach { case (name, b) =>
-        writeText(Pickler.write(b), parent.resolve(name))
+        writeText(Pickler.write(b), parent.resolve(s"$name.json"))
       }
       println("API generated")
     }
