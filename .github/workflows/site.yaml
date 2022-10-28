@@ -1,10 +1,10 @@
 name: Deploy static website
 
 on:
+  pull_request:
   push:
-    branches: [ "main" ]
   workflow_run:
-    workflows: [ gcc, llvm ]
+    workflows: [ Generate LLVM snapshots, Generate GCC snapshots ]
     types:
       - completed
 
@@ -37,13 +37,10 @@ jobs:
           sbt "project webapp; dist"
       - name: Fetch builds
         run: |
-          sbt "project generator; run gcc $GITHUB_REPOSITORY; run llvm $GITHUB_REPOSITORY"
-          mv *.json docs
-      - name: Generate static API
-        run: |
-          cd docs
-          ../action_generate_api.sh gcc api
-          ../action_generate_api.sh llvm api
+          sbt "project generator; run gcc $GITHUB_REPOSITORY true; run llvm $GITHUB_REPOSITORY true"
+          mv *.json docs/
+          mv gcc docs/
+          mv llvm docs/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:

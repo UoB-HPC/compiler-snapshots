@@ -86,8 +86,8 @@ object Generator {
 
     println(s"Ignoring the following commits: \n${ignoreCommits.mkString("\n")}")
 
-    val (config, repoOwner, repoName) = args.toList match {
-      case config :: s"$repoOwner/$repoName" :: Nil =>
+    val (config, repoOwner, repoName, generateApi) = args.toList match {
+      case config :: s"$repoOwner/$repoName" :: xs if xs.size <= 1 =>
         (
           config.toLowerCase match {
             case "llvm" => LLVM
@@ -95,10 +95,13 @@ object Generator {
             case _      => Console.err.println(s"Unsupported config: $config"); sys.exit(1)
           },
           repoOwner,
-          repoName
+          repoName,
+          xs.contains("true")
         )
       case bad =>
-        Console.err.println(s"Bad arg `${bad.mkString(" ")}`, expecting `config repoOwner repoName`")
+        Console.err.println(
+          s"Bad arg `${bad.mkString(" ")}`, expecting `config:string repoOwner:string repoName:string api:(true|false)?`"
+        )
         sys.exit(1)
     }
 
@@ -257,5 +260,14 @@ object Generator {
     writeText(Pickler.write(builds.to(Map)), Paths.get(s"builds-${config.name}.json"))
     writeText(Pickler.write(missingBuilds.keys.toList), Paths.get(s"missing-${config.name}.json"))
     println("Build computed")
+
+    if (generateApi) {
+      val parent = Files.createDirectories(Paths.get(config.name))
+      println(s"Generating static APIs ($builds files) in $parent")
+      builds.foreach { case (name, b) =>
+        writeText(Pickler.write(b), parent.resolve(name))
+      }
+      println("API generated")
+    }
   }
 }
