@@ -20,11 +20,11 @@ jobs:
   build_container:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Restore cached image
         id: restore-image
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /tmp/build_image.tar
           key: ${{ hashFiles('Dockerfile') }}
@@ -46,7 +46,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-builds.outputs.builds }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Compute required builds
         run: sbt "project generator; run ${{ inputs.config }} $GITHUB_REPOSITORY"
@@ -61,7 +61,7 @@ jobs:
         run: echo "builds=$(cat matrix-${{ inputs.config }}.json)" >> $GITHUB_OUTPUT
 
       - name: Save build artefact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: builds
           path: builds-${{ inputs.config }}.json
@@ -75,17 +75,17 @@ jobs:
       matrix:
         jobs: ${{ fromJson(needs.compute_builds.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Restore cached image
         id: restore-image
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /tmp/build_image.tar
           key: ${{ hashFiles('Dockerfile') }}
 
       - name: Restore build artefact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v5
         with:
           name: builds
 
