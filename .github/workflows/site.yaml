@@ -32,6 +32,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
       - name: Setup Pages
         run: |
           sbt "project webapp; dist"
