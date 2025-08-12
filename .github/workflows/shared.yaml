@@ -48,6 +48,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
+
       - name: Compute required builds
         run: sbt "project generator; run ${{ inputs.config }} $GITHUB_REPOSITORY"
 
