@@ -3,7 +3,7 @@
 set -eu
 
 set +u # scl_source has unbound vars, disable check
-source scl_source enable devtoolset-10 || true
+source scl_source enable gcc-toolset-14 || true
 set -u
 
 BUILDS=$1

@@ -18,7 +18,7 @@ concurrency:
 jobs:
 
   build_container:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +42,7 @@ jobs:
           outputs: type=docker,dest=/tmp/build_image.tar
 
   compute_builds:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.set-builds.outputs.builds }}
     steps:
@@ -68,7 +68,7 @@ jobs:
 
   build:
     needs: [ compute_builds, build_container ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: ${{ needs.compute_builds.outputs.matrix != '[]' && needs.compute_builds.outputs.matrix != '' }}
     strategy:
       fail-fast: false # don't give up too early
