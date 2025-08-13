@@ -1,23 +1,27 @@
 package uob_hpc.snapshots
 
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.IsoFields
+import scala.collection.immutable.ArraySeq
+import scala.collection.immutable.VectorMap
+import scala.jdk.CollectionConverters.*
+import scala.util.Try
+import scala.util.Using
+
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.errors.TransportException
 import org.eclipse.jgit.lib.Ref
-import org.eclipse.jgit.revwalk.{RevCommit, RevWalk}
-import org.eclipse.jgit.revwalk.filter.RevFilter
+import org.eclipse.jgit.revwalk.RevCommit
 import org.eclipse.jgit.transport.TagOpt
-import org.eclipse.jgit.treewalk.{CanonicalTreeParser, TreeWalk}
+import org.eclipse.jgit.treewalk.TreeWalk
 import org.eclipse.jgit.treewalk.filter.PathFilter
-
-import java.net.URI
-import java.net.http.{HttpClient, HttpRequest, HttpResponse}
-import java.nio.file.{Files, Path, Paths, StandardOpenOption}
-import java.time.format.DateTimeFormatter
-import java.time.temporal.IsoFields
-import java.time.{Instant, LocalDate, Year, ZoneId, ZoneOffset, ZonedDateTime}
-import scala.collection.immutable.{ArraySeq, VectorMap}
-import scala.jdk.CollectionConverters.*
-import scala.util.{Try, Using}
 
 def writeText(xs: String, path: Path) = Files.writeString(
   path,
@@ -86,7 +90,7 @@ object Generator {
 
     println(s"Ignoring the following commits: \n${ignoreCommits.mkString("\n")}")
 
-    val (config, repoOwner, repoName, generateApi) = args.toList match {
+    val (config, _, _, generateApi) = args.toList match {
       case config :: s"$repoOwner/$repoName" :: xs if xs.size <= 1 =>
         (
           config.toLowerCase match {
@@ -107,20 +111,18 @@ object Generator {
 
     val repoDir = Paths.get(s"./${config.name}-bare").normalize().toAbsolutePath
     if (!Files.exists(repoDir)) {
-      sys.process
-        .Process(
-          Seq(
-            "git",
-            "clone",
-            "--progress",
-            "--bare",
-            "--no-checkout",
-            s"--filter=${if (config.requirePath.isDefined) "blob:none" else "tree:0"}",
-            config.mirror,
-            repoDir.toString
-          )
+      sys.process.Process(
+        Seq(
+          "git",
+          "clone",
+          "--progress",
+          "--bare",
+          "--no-checkout",
+          s"--filter=${if (config.requirePath.isDefined) "blob:none" else "tree:0"}",
+          config.mirror,
+          repoDir.toString
         )
-        .!
+      ).! : Unit
     }
 
     val git = Git.open(repoDir.toFile)
@@ -150,8 +152,8 @@ object Generator {
       .sortBy(_._1.toIntOption)
       .flatMap { case (ver, basepoint) =>
         println(s"Basepoint=$basepoint => Branch=${branches.get(ver)} ")
-        val repo   = git.getRepository
-        val reader = repo.newObjectReader()
+        val repo    = git.getRepository
+        val reader  = repo.newObjectReader()
         val endSpec = branches.get(ver) match {
           case Some(branchRef) => branchRef.getName
           case None            => "refs/heads/master"
@@ -169,7 +171,7 @@ object Generator {
           .filterNot(c => ignoreCommits.exists(c.getName.startsWith(_)))
           .filter { c =>
             config.requirePath match {
-              case None => true
+              case None       => true
               case Some(path) =>
                 Using(TreeWalk(repo)) { walk =>
                   walk.addTree(c.getTree)
@@ -180,9 +182,10 @@ object Generator {
             }
           }
           .map(c => c -> c.getCommitterIdent)
-          .groupBy { case (_, ident) => // group by (YYYY, WW)
-            val time = ident.getWhenAsInstant.atOffset(ZoneOffset.UTC)
-            time.get(IsoFields.WEEK_BASED_YEAR) -> time.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
+          .groupBy {
+            case (_, ident) => // group by (YYYY, WW)
+              val time = ident.getWhenAsInstant.atOffset(ZoneOffset.UTC)
+              time.get(IsoFields.WEEK_BASED_YEAR) -> time.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
           }
           .toList
           .sortBy(_._1)
@@ -195,7 +198,7 @@ object Generator {
           }
           .scanLeft[Option[(RevCommit, Build)]](None) { case (origin, (c, ident)) =>
             val changes = origin match {
-              case None => ArraySeq.empty[(String, Instant, String)]
+              case None         => ArraySeq.empty[(String, Instant, String)]
               case Some((x, _)) =>
                 commits.dropWhile(_ != x).takeWhile(_ != c).reverse.to(ArraySeq).map { c =>
                   val hash    = reader.abbreviate(c).name()

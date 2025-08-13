@@ -1,44 +1,39 @@
 package uob_hpc.snapshots
 
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import scala.collection.immutable.ArraySeq
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.scalajs.js
+import scala.scalajs.js.annotation.JSImport
+import scala.util.Failure
+import scala.util.Success
+
 import com.raquo.airstream.state.Var
 import com.raquo.laminar.api.L.*
 import com.raquo.waypoint.*
 import org.scalajs.dom
 import org.scalajs.dom.window
 import uob_hpc.snapshots.Pickler.*
-import urldsl.vocabulary.UrlMatching
-
-import java.time.format.DateTimeFormatter
-import java.time.{Instant, ZoneOffset}
-import scala.collection.immutable.ArraySeq
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.scalajs.js
-import scala.scalajs.js.annotation.JSImport
-import scala.util.{Failure, Success, Try}
 
 object WebApp {
 
-  case class Index(build: Option[String] = None)
-  object Index {
-    given ReadWriter[Index] = macroRW
-  }
+  case class Index(build: Option[String] = None) derives ReadWriter
 
-  private val router = new Router[Index](
-    routes = List(
-      Route.onlyFragment[Index, Option[String]](
-        _.build,
-        Index(_),
-        (root / endOfSegments).withFragment(maybeFragment[String]),
-        s"${window.location.pathname}#"
+  object router extends Router[Index](
+        routes = List(
+          Route.onlyFragment[Index, Option[String]](
+            _.build,
+            Index(_),
+            (root / endOfSegments).withFragment(maybeFragment[String]),
+            s"${window.location.pathname}#"
+          )
+        ),
+        getPageTitle = p => s"Compiler snapshots${p.build.fold("")(x => s" - $x")}",
+        serializePage = Pickler.web.write(_),
+        deserializePage = Pickler.web.read[Index](_)
       )
-    ),
-    getPageTitle = p => s"Compiler snapshots${p.build.fold("")(x => s" - $x")}",
-    serializePage = Pickler.web.write(_),
-    deserializePage = Pickler.web.read[Index](_)
-  )(
-    $popStateEvent = windowEvents.onPopState,
-    owner = unsafeWindowOwner
-  )
 
   private def navigateTo(page: Index, replace: Boolean = false): Binder[HtmlElement] = Binder { el =>
     val isLinkElement = el.ref.isInstanceOf[dom.html.Anchor]
@@ -75,7 +70,7 @@ object WebApp {
     Compiler.values.foreach { c =>
       fetchJson[Map[String, Build]](s"./builds-${c.toString.toLowerCase}.json").onComplete(x =>
         builds(c).set(x match {
-          case Failure(e) => Deferred.Error(e)
+          case Failure(e)  => Deferred.Error(e)
           case Success(xs) =>
             lut.update(_ ++ xs.map(x => x._1 -> (x._1, x._2, c)))
             Deferred.Success(xs)
@@ -119,28 +114,28 @@ object WebApp {
       |""".stripMargin
     dom.document.head.append(globalStylesheet)
 
-    val pageSplitter = SplitRender[Index, HtmlElement](router.$currentPage)
+    val pageSplitter = SplitRender[Index, HtmlElement](router.currentPageSignal)
       .collectSignal[Index] { sig =>
 
         val compiler = Var[Compiler](Compiler.GCC)
         val filter   = Var[String]("")
 
-        val buildSelection = article(
-          cls          := "panel is-info",
-          border       := "1.5px solid #3e8ed0",
-          borderRadius := 8.px,
+        val buildSelection = articleTag(
+          cls             := "panel is-info",
+          border          := "1.5px solid #3e8ed0",
+          borderRadius.px := 8,
           overflow.hidden,
           display.flex,
           flexDirection.column,
-          maxHeight := 100.pct,
-          p(cls := "panel-heading", s"Snapshots", fontSize := 0.9.em),
+          maxHeight.percent := 100,
+          p(cls := "panel-heading", s"Snapshots", fontSize.em := 0.9),
           div(
-            cls          := "tabs is-boxed is-centered",
-            flexShrink   := "0",
-            marginBottom := 8.px,
+            cls             := "tabs is-boxed is-centered",
+            flexShrink      := "0",
+            marginBottom.px := 8,
             ul(Compiler.values.toSeq.map { c =>
               li(
-                cls.toggle("is-active").<--(compiler.signal.map(_ == c)),
+                cls("is-active") <-- compiler.signal.map(_ == c),
                 a(
                   child.text <-- missings(c).signal.combineWith(builds(c).signal).map {
                     case (Deferred.Success(ys), Deferred.Success(xs)) => s"$c (${xs.size - ys.size})"
@@ -167,11 +162,11 @@ object WebApp {
           Compiler.values.toSeq.map { c =>
             div(
               overflow.scroll,
-              height := 100.pct,
+              height.percent := 100,
               display <-- compiler.signal.map(_ == c).map(if (_) "block" else "none"),
               children <-- missings(c).signal.combineWith(builds(c).signal, filter.signal).map {
-                case (Deferred.Error(e), _, _) => Seq(span(e.stackTraceAsString))
-                case (_, Deferred.Error(e), _) => Seq(span(e.stackTraceAsString))
+                case (Deferred.Error(e), _, _)                        => Seq(span(e.stackTraceAsString))
+                case (_, Deferred.Error(e), _)                        => Seq(span(e.stackTraceAsString))
                 case (Deferred.Success(ys), Deferred.Success(xs), kw) =>
                   val missings = ys.toSet
                   xs.to(ArraySeq)
@@ -179,15 +174,15 @@ object WebApp {
                       if (kw.isBlank) true
                       else build.hash.contains(kw) || build.isoDate.contains(kw) || build.version.contains(kw)
                     }
-                    .sortBy(x => x._2.date -> x._2.version)(Ordering[(Instant, String)].reverse)
+                    .sortBy(x => x._2.date -> x._2.version)(using Ordering[(Instant, String)].reverse)
                     .map { case (key, x) =>
                       val selected = sig.map(_.build.contains(key))
                       a(
-                        if (!missings.contains(key)) navigateTo(Index(Some(key)), replace = false)
+                        if (!missings.contains(key)) navigateTo(Index(Some(key)))
                         else cls := "missing-row",
-                        cls.toggle("highlight-row is-active") <-- selected,
-                        cls  := "panel-block",
-                        name := key,
+                        cls("highlight-row is-active") <-- selected,
+                        cls      := "panel-block",
+                        nameAttr := key,
                         span(cls := "panel-icon", i(cls := "fas fa-file-archive ", dataAttr("aria-hidden") := "true")),
                         fontFamily := "monospace",
                         s"[${x.shortHash}]",
@@ -200,11 +195,11 @@ object WebApp {
                     } :+ div(
                     onMountCallback { ctx =>
                       for {
-                        key     <- sig.observe(ctx.owner).now().build
+                        key     <- sig.observe(using ctx.owner).now().build
                         element <- Option(ctx.thisNode.ref.parentElement.querySelector(s"""[name="$key"]"""))
                       } {
                         element.scrollIntoView()
-                        lut.signal.foreach(_.get(key).foreach { case (_, _, c) => compiler.set(c) })(ctx.owner)
+                        lut.signal.foreach(_.get(key).foreach { case (_, _, c) => compiler.set(c) })(using ctx.owner)
                       }
                     }
                   )
@@ -228,24 +223,24 @@ object WebApp {
           case _                                 => "UNKNOWN"
         }
 
-        val selectedBuild = article(
-          cls    := "message is-info",
-          height := 100.pct,
+        val selectedBuild = articleTag(
+          cls            := "message is-info",
+          height.percent := 100,
           div(
             cls := "message-body",
             overflow.hidden,
-            height := 100.pct,
+            height.percent := 100,
             child <-- sig.combineWith(lut.signal).map {
-              case (Index(None), _) => span("Select a build for details")
+              case (Index(None), _)      => span("Select a build for details")
               case (Index(Some(x)), lut) =>
                 lut.get(x) match {
-                  case None if lut.isEmpty => span(s"Loading")
-                  case None                => span(s"Build \"$x\" not found")
+                  case None if lut.isEmpty           => span(s"Loading")
+                  case None                          => span(s"Build \"$x\" not found")
                   case Some((name, build, compiler)) =>
 
                     div(
                       overflow.hidden,
-                      height := 100.pct,
+                      height.percent := 100,
                       table(
                         cls             := "table is-narrow is-fullwidth",
                         backgroundColor := "transparent",
@@ -274,7 +269,7 @@ object WebApp {
                       div(
                         cls := "content is-small",
                         overflow.scroll,
-                        height := 100.pct,
+                        height.percent := 100,
                         ul(build.changes.map { case (hash, date, message) =>
                           li(
                             a(
@@ -304,14 +299,14 @@ object WebApp {
           display.flex,
           flexDirection.column,
           alignItems.stretch,
-          height := 100.pct,
+          height.percent := 100,
           a(
             href := "/",
             h1(
               cls := "title",
               textAlign.center,
-              marginBottom := 8.px,
-              span(cls := "icon", i(cls := "fas fa-cookie-bite"), margin := 16.px),
+              marginBottom.px := 8,
+              span(cls := "icon", i(cls := "fas fa-cookie-bite"), margin.px := 16),
               "Compiler snapshots"
             )
           ),
@@ -335,17 +330,17 @@ object WebApp {
             )
           ),
           div(
-            cls          := "columns",
-            flexGrow     := 1,
-            marginBottom := 10.px,
+            cls             := "columns",
+            flexGrow        := 1,
+            marginBottom.px := 10,
             overflow.hidden,
             div(
               cls := "column is-one-third",
-              cls.toggle("is-hidden-mobile") <-- sig.map(_.build.isDefined),
-              height := 100.pct,
+              cls("is-hidden-mobile") <-- sig.map(_.build.isDefined),
+              height.percent := 100,
               buildSelection
             ),
-            div(cls := "column is-full-mobile", height := 100.pct, selectedBuild)
+            div(cls := "column is-full-mobile", height.percent := 100, selectedBuild)
           )
         )
       }
@@ -358,9 +353,8 @@ object WebApp {
         left   := "0",
         bottom := "0",
         right  := "0",
-        child <-- pageSplitter.$view
+        child <-- pageSplitter.signal
       )
-    )
-
+    ): Unit
   }
 }

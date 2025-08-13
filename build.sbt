@@ -1,16 +1,16 @@
-import org.scalajs.linker.interface.{ESFeatures, ESVersion}
-
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+
+import org.scalajs.linker.interface.ESFeatures
+import org.scalajs.linker.interface.ESVersion
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 lazy val start = TaskKey[Unit]("start")
 lazy val dist  = TaskKey[File]("dist")
 
-lazy val scala3Version  = "3.2.0"
-lazy val catsVersion    = "2.8.0"
-lazy val upickleVersion = "2.0.0"
+lazy val scala3Version  = "3.7.2"
+lazy val upickleVersion = "4.2.1"
 lazy val munitVersion   = "1.0.0-M5"
 
 lazy val commonSettings = Seq(
@@ -27,15 +27,18 @@ lazy val commonSettings = Seq(
       Seq("-source", "1.8") ++
       Seq("-target", "1.8"),
   scalacOptions ++= Seq(
-//    "-explain",                              //
+    "-Wunused:all",                              //
     "-no-indent",                                //
     "-Wconf:cat=unchecked:error",                //
     "-Wconf:name=MatchCaseUnreachable:error",    //
     "-Wconf:name=PatternMatchExhaustivity:error" //
     // "-language:strictEquality"
   ),
-  scalafmtDetailedError := true,
-  scalafmtFailOnErrors  := true
+  scalafmtDetailedError                  := true,
+  scalafmtFailOnErrors                   := true,
+  Compile / packageDoc / publishArtifact := false,
+  Compile / doc / sources                := Seq(),
+  (Compile / tpolecatExcludeOptions) ++= ScalacOptions.defaultConsoleExclude
 )
 
 lazy val model = crossProject(JSPlatform, JVMPlatform)
@@ -50,14 +53,14 @@ lazy val generator = project
     commonSettings,
     name := "generator",
     libraryDependencies ++= Seq(
-      "org.slf4j"        % "slf4j-simple"     % "2.0.3",
-      "org.eclipse.jgit" % "org.eclipse.jgit" % "6.3.0.202209071007-r",
-      "com.lihaoyi"     %% "upickle"          % "2.0.0"
+      "org.slf4j"        % "slf4j-simple"     % "2.0.17",
+      "org.eclipse.jgit" % "org.eclipse.jgit" % "7.3.0.202506031305-r",
+      "com.lihaoyi"     %% "upickle"          % upickleVersion
     ),
     Compile / packageBin / mainClass := Some("uob_hpc.Main"),
-    assemblyMergeStrategy := {
+    assemblyMergeStrategy            := {
       case PathList("META-INF", "versions", "9", "module-info.class") => MergeStrategy.discard
-      case x =>
+      case x                                                          =>
         val oldStrategy = (ThisBuild / assemblyMergeStrategy).value
         oldStrategy(x)
     }
@@ -89,10 +92,10 @@ lazy val webapp = project
     Compile / fullOptJS / webpackDevServerExtraArgs += "--mode=production",
     webpackConfigFile := Some((ThisBuild / baseDirectory).value / "webpack.config.mjs"),
     libraryDependencies ++= Seq(
-      "org.scala-js"      %%% "scalajs-dom"     % "2.3.0",
-      "io.github.cquiroz" %%% "scala-java-time" % "2.4.0", // ignore timezones
-      "com.raquo"         %%% "laminar"         % "0.14.5",
-      "com.raquo"         %%% "waypoint"        % "0.5.0"
+      "org.scala-js"      %%% "scalajs-dom"     % "2.8.1",
+      "io.github.cquiroz" %%% "scala-java-time" % "2.6.0", // ignore timezones
+      "com.raquo"         %%% "laminar"         % "17.2.1",
+      "com.raquo"         %%% "waypoint"        % "9.0.0"
     ),
     stIgnore ++= List(
       "node",
@@ -114,9 +117,8 @@ lazy val webapp = project
     )
   )
   .settings(
-    start := {
-      (Compile / fastOptJS / startWebpackDevServer).value
-    },
+    start :=
+      (Compile / fastOptJS / startWebpackDevServer).value,
     dist := {
       val artifacts      = (Compile / fullOptJS / webpack).value
       val artifactFolder = (Compile / fullOptJS / crossTarget).value
