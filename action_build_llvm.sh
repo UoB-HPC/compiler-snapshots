@@ -25,6 +25,10 @@ for build in "${builds_array[@]}"; do
 
   hash=$(jq -r ".\"$build\" | .hash" "/host/builds.json")
 
+  # Commits before https://github.com/llvm/llvm-project/commit/7f5fe30a150e will only work with
+  # CMake < 3.17 due to a bug in LLVM's ExternalProjectAdd.
+  TGT_FIX=7f5fe30a150e7e87d3fbe4da4ab0e76ec38b40b9
+
   echo "Build   : $build"
   echo "Commit  : $hash"
 
@@ -34,17 +38,24 @@ for build in "${builds_array[@]}"; do
     --prune \
     --progress \
     --no-recurse-submodules \
-    --depth=1 \
-    origin "$hash"
+    --filter=blob:none \
+    origin "$hash" "$TGT_FIX"
 
-  git reset
-  git checkout FETCH_HEAD
+  git checkout -q "$hash"
 
-  # Commits before https://github.com/llvm/llvm-project/commit/7f5fe30a150e will only work with
-  # CMake < 3.17 due to a bug in LLVM's ExternalProjectAdd.
 
   has_tgt_fix=0
-  git merge-base --is-ancestor 7f5fe30a150e7e87d3fbe4da4ab0e76ec38b40b9 "$hash" || has_tgt_fix=$?
+  if git merge-base --is-ancestor "$TGT_FIX" "$hash"; then
+    has_tgt_fix=0
+  else
+    rc=$?
+    if [ "$rc" -eq 1 ]; then
+      has_tgt_fix=1
+    else
+      echo "Unable to determine ancestry (git merge-base failed with code $rc); assuming fix present."
+      has_tgt_fix=0
+    fi
+  fi
 
   if [ "$has_tgt_fix" -ne 0 ]; then
     echo "Commit requires CMake < 3.17, downloading that now..."
