@@ -1,6 +1,7 @@
 name: Generate GCC snapshots
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
   schedule:

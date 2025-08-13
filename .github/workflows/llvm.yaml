@@ -1,6 +1,7 @@
 name: Generate LLVM snapshots
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
   schedule:
