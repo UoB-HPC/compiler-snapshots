@@ -14,10 +14,9 @@ import scala.collection.immutable.VectorMap
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import scala.util.Using
-
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.errors.TransportException
-import org.eclipse.jgit.lib.Ref
+import org.eclipse.jgit.lib.{Constants, Ref}
 import org.eclipse.jgit.revwalk.RevCommit
 import org.eclipse.jgit.transport.TagOpt
 import org.eclipse.jgit.treewalk.TreeWalk
@@ -151,17 +150,18 @@ object Generator {
     val builds = basepoints.toVector
       .sortBy(_._1.toIntOption)
       .flatMap { case (ver, basepoint) =>
-        println(s"Basepoint=$basepoint => Branch=${branches.get(ver)} ")
         val repo    = git.getRepository
         val reader  = repo.newObjectReader()
         val endSpec = branches.get(ver) match {
           case Some(branchRef) => branchRef.getName
-          case None            => "refs/heads/master"
+          case None            => Constants.HEAD
         }
+        val endRef = repo.resolve(endSpec)
+        println(s"Basepoint=$basepoint => Branch=$endSpec ($endRef)")
         val commits =
           git
             .log()
-            .addRange(basepoint.getPeeledObjectId, repo.resolve(endSpec))
+            .addRange(basepoint.getPeeledObjectId, endRef)
             .call()
             .asScala
             .toVector
