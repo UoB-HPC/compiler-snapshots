@@ -57,7 +57,9 @@ for build in "${builds_array[@]}"; do
     time ./contrib/download_prerequisites --no-isl --no-verify
     (
       cd build
-      ../configure --prefix="/opt/$build" --enable-languages=c,c++ --disable-bootstrap --disable-multilib --disable-libvtv --without-isl
+      ../configure \
+      CFLAGS=-Wno-error=incompatible-pointer-types \
+      --prefix="/opt/$build" --enable-languages=c,c++,fortran --disable-bootstrap --disable-multilib --disable-libvtv --without-isl
     )
     time make -C build -j "$(nproc)"
     time make -C build -j "$(nproc)" install DESTDIR="$dest_dir"

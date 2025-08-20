@@ -83,10 +83,11 @@ for build in "${builds_array[@]}"; do
     mkdir -p build
 
     # compiler-rt implements atomic which openmp needs
-    time cmake3 -S llvm -B build \
+    time CXXFLAGS="-include cstdint -Wno-template-id-cdtor -Wno-missing-template-keyword -Wno-attributes" \
+      cmake3 -S llvm -B build \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_SHARED_LIBS=OFF \
-      -DLLVM_ENABLE_PROJECTS="clang;lld;openmp;polly;pstl" \
+      -DLLVM_ENABLE_PROJECTS="clang;lld;openmp;pstl" \
       -DLLVM_ENABLE_RTTI=ON \
       -DLLVM_INCLUDE_BENCHMARKS=OFF \
       -DLLVM_INCLUDE_TESTS=OFF \
@@ -95,6 +96,7 @@ for build in "${builds_array[@]}"; do
       -DLLVM_BUILD_TESTS=OFF \
       -DLLVM_BUILD_DOCS=OFF \
       -DLLVM_BUILD_EXAMPLES=OFF \
+      -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
       -DLIBOMP_USE_QUAD_PRECISION=OFF \
       -DCMAKE_INSTALL_PREFIX="$dest_dir/opt/$build" \
       -GNinja
