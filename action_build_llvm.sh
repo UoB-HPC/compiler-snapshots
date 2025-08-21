@@ -83,7 +83,7 @@ for build in "${builds_array[@]}"; do
     mkdir -p build
 
     # compiler-rt implements atomic which openmp needs
-    time CXXFLAGS="-include cstdint -Wno-template-id-cdtor -Wno-missing-template-keyword -Wno-attributes" \
+    time CXXFLAGS="-include cstdint -include cstdlib -include string -include cstdio -Wno-template-id-cdtor -Wno-missing-template-keyword -Wno-attributes" \
       cmake3 -S llvm -B build \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_SHARED_LIBS=OFF \
